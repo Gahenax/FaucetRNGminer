@@ -7,7 +7,7 @@ import ftplib
 FTP_HOST = "151.106.106.26"
 FTP_USER = "u314799704.gahenaxaisolutions.online"
 FTP_PASS = "Luisdaniel949."
-REMOTE_DIR = "public_html" 
+REMOTE_APP_DIR = "" # Target the root of the FTP (where the app lives)
 
 FILES_TO_DEPLOY = [
     "index.js",
@@ -22,19 +22,28 @@ FILES_TO_DEPLOY = [
     "scripts/gahenax_hybrid_v5.js"
 ]
 
+function_connect = None # Placeholder to keep line references similar
+
 def connect():
     ftp = ftplib.FTP(FTP_HOST)
     ftp.login(user=FTP_USER, passwd=FTP_PASS)
     return ftp
 
 def upload_file(ftp, local_path):
-    print(f"  [NODE-PUSH] {local_path} -> {local_path}")
+    remote_path = f"{REMOTE_APP_DIR}/{local_path}"
+    print(f"  [NODE-TARGET-PUSH] {local_path} -> {remote_path}")
+    
+    # Handle subdirectories (scripts, tmp)
     if "/" in local_path:
-        remote_dir = os.path.dirname(local_path)
-        try: ftp.mkd(remote_dir)
-        except: pass
+        dirs = local_path.split("/")[:-1]
+        current_dir = REMOTE_APP_DIR
+        for d in dirs:
+            current_dir = f"{current_dir}/{d}"
+            try: ftp.mkd(current_dir)
+            except: pass
+
     with open(local_path, "rb") as f:
-        ftp.storbinary(f"STOR {local_path}", f)
+        ftp.storbinary(f"STOR {remote_path}", f)
 
 if __name__ == "__main__":
     try:
