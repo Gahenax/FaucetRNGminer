@@ -7,13 +7,14 @@ import ftplib
 FTP_HOST = "151.106.106.26"
 FTP_USER = "u314799704.gahenaxaisolutions.online"
 FTP_PASS = "Luisdaniel949."
-REMOTE_APP_DIR = "" # Target the root of the FTP (where the app lives)
+REMOTE_APP_DIR = "../domains/gahenaxaisolutions.online/nodejs" 
 
 FILES_TO_DEPLOY = [
     "index.js",
     "package.json",
     "mines_radar.html",
     "tmp/restart.txt",
+    "scripts/gahenax_pulse_v62.js",
     "scripts/gahenax_pulse_v60.js",
     "scripts/gahenax_hybrid_v6.js",
     "scripts/gahenax_pulse_v40.js",
