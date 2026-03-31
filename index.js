@@ -80,7 +80,8 @@ class OracleEngine {
         const { seeds, telemetry } = payload;
         this.state.session.last_heartbeat = Date.now();
 
-        if (seeds) {
+        // ONLY update config if seeds are actually provided (NOT empty)
+        if (seeds && seeds.server && seeds.client) {
             const isNewMission = seeds.server !== this.state.config.server;
             this.state.config = { 
                 server: seeds.server, 
@@ -91,6 +92,7 @@ class OracleEngine {
                 this.state.metadata.status = "CALIBRATED";
                 this.state.metadata.mission_count++;
                 this.state.radar.history = [];
+                console.log(`[ORACLE] Re-Calibrated (Mission #${this.state.metadata.mission_count})`);
             }
         }
 
@@ -100,7 +102,7 @@ class OracleEngine {
             this.state.session.last_mode = mode ?? this.state.session.last_mode;
             this.state.session.rounds++;
             
-            if (nonce) {
+            if (nonce && nonce > this.state.config.current_nonce) {
                 this.state.config.current_nonce = nonce;
                 const outcome = this.calculateOutcome(nonce);
                 if (outcome) {
@@ -290,18 +292,35 @@ app.get('/', (req, res) => {
                     const timeDiff = (data.server_time - data.session.last_heartbeat) / 1000;
                     const led = document.getElementById('led');
                     const st = document.getElementById('status-text');
+                    const log = document.getElementById('log-stream');
                     
                     if (timeDiff < 10 && data.session.last_heartbeat > 0) {
+                        if (!led.classList.contains('on')) {
+                            log.innerHTML += \`<div>[SYSTEM] Connection Re-Established. HEARTBEAT ACTIVE. </div>\`;
+                        }
                         led.classList.add('on');
                         st.innerText = "MISSION ACTIVE";
                         st.style.color = "var(--neon)";
                     } else {
+                        if (led.classList.contains('on')) {
+                            log.innerHTML += \`<div style="color:#ef4444;">[WARN] Heartbeat lost. Waiting for Pulses...</div>\`;
+                        }
                         led.classList.remove('on');
                         st.innerText = "WAITING FOR PULSE";
                         st.style.color = "#64748b";
                     }
 
-                    if (data.radar.forecast) {
+                    // Simple Logger: Show last mode and rounds
+                    if (data.session.rounds > 0) {
+                        const lastMsg = log.lastElementChild?.innerText || "";
+                        const newMsg = \`[SYNC] ROUND #\${data.session.rounds} | MODE: \${data.session.last_mode}\`;
+                        if (!lastMsg.includes(newMsg)) {
+                            log.innerHTML += \`<div>\${newMsg}</div>\`;
+                            log.scrollTop = log.scrollHeight;
+                        }
+                    }
+
+                    if (data.radar.forecast && data.metadata.status === "CALIBRATED") {
                         document.getElementById('radar-row').innerHTML = data.radar.forecast.map(f => \`
                             <div class="node">
                                 <div style="font-size: 10px; color: #334155; font-weight: 800; margin-bottom: 4px;">#\${f.nonce}</div>
@@ -309,6 +328,8 @@ app.get('/', (req, res) => {
                                 <div style="font-size: 9px; opacity: 0.5; font-weight: 700; margin-top: 4px;">\${f.type}</div>
                             </div>
                         \`).join('');
+                    } else if (data.metadata.status === "IDLE") {
+                        document.getElementById('radar-row').innerHTML = \`<div style="color:#334155; font-size:11px;">Awaiting Seed Calibration via Pulse v6.x...</div>\`;
                     }
                 } catch(e) {}
             }
