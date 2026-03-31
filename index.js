@@ -91,7 +91,22 @@ app.post('/api/sync', (req, res) => {
 
 app.get('/api/oracle', (req, res) => res.json(STATE));
 
-// --- 4. MINIMALIST DASHBOARD ---
+app.get('/api/debug', (req, res) => {
+    try {
+        const testFile = path.join(__dirname, 'test.txt');
+        fs.writeFileSync(testFile, `Test write at ${new Date().toISOString()}`, 'utf8');
+        const content = fs.readFileSync(testFile, 'utf8');
+        res.json({ 
+            status: "SUCCESS", 
+            message: "File system is WRITABLE", 
+            read_back: content,
+            dir: __dirname,
+            files: fs.readdirSync(__dirname)
+        });
+    } catch(e) {
+        res.status(500).json({ status: "ERROR", error: e.message, dir: __dirname });
+    }
+});
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
