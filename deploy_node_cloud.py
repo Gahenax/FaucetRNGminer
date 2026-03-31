@@ -14,7 +14,8 @@ FILES_TO_DEPLOY = [
     "package.json",
     "mines_radar.html",
     "scripts/gahenax_pulse_v40.js",
-    "scripts/gahenax_pulse_v40.1.js"
+    "scripts/gahenax_pulse_v40.1.js",
+    "scripts/gahenax_pulse_v40.3.js"
 ]
 
 def connect():
