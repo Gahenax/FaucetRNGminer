@@ -14,9 +14,9 @@ const STATE_FILE = path.join(__dirname, 'state.json');
 
 // --- 1. CORE STATE MANAGEMENT ---
 let STATE = {
-    metadata: { version: "6.0", status: "IDLE", mission_count: 0 },
+    metadata: { version: "6.1", status: "IDLE", mission_count: 0 },
     config: { server: "", client: "", current_nonce: 0 },
-    session: { profit: 0, rounds: 0, last_mode: "IDLE" },
+    session: { profit: 0, rounds: 0, last_mode: "IDLE", last_heartbeat: 0 },
     radar: { forecast: [], history: [] }
 };
 
@@ -30,7 +30,7 @@ if (fs.existsSync(STATE_FILE)) {
     try {
         const saved = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
         STATE = { ...STATE, ...saved };
-        console.log(`[GAHENAX] Persistence Recovery: MISSION #${STATE.metadata.mission_count}`);
+        console.log(`[GAHENAX] Recovery: MISSION #${STATE.metadata.mission_count}`);
     } catch(e) { console.log("[GAHENAX] Fresh start initiated."); }
 }
 
@@ -61,6 +61,7 @@ app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
 // Unified Sync Endpoint
 app.post('/api/sync', (req, res) => {
     const { seeds, telemetry } = req.body;
+    STATE.session.last_heartbeat = Date.now();
 
     if (seeds) {
         STATE.config = { server: seeds.server, client: seeds.client, current_nonce: seeds.nonce || 0 };
@@ -86,47 +87,44 @@ app.post('/api/sync', (req, res) => {
 
     recomputeRadar();
     syncStorage();
-    res.json({ status: "OK", calibrated: STATE.metadata.status === "CALIBRATED" });
+    res.json({ status: "OK", server_time: Date.now() });
 });
 
-app.get('/api/oracle', (req, res) => res.json(STATE));
+app.get('/api/oracle', (req, res) => res.json({ ...STATE, server_time: Date.now() }));
 
 app.get('/api/debug', (req, res) => {
     try {
         const testFile = path.join(__dirname, 'test.txt');
         fs.writeFileSync(testFile, `Test write at ${new Date().toISOString()}`, 'utf8');
-        const content = fs.readFileSync(testFile, 'utf8');
-        res.json({ 
-            status: "SUCCESS", 
-            message: "File system is WRITABLE", 
-            read_back: content,
-            dir: __dirname,
-            files: fs.readdirSync(__dirname)
-        });
+        res.json({ status: "SUCCESS", dir: __dirname, files: fs.readdirSync(__dirname) });
     } catch(e) {
-        res.status(500).json({ status: "ERROR", error: e.message, dir: __dirname });
+        res.status(500).json({ status: "ERROR", error: e.message });
     }
 });
+
+// --- 4. MINIMALIST DASHBOARD ---
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>GAHENAX KERNEL v6.0</title>
+        <title>GAHENAX KERNEL v6.1</title>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
         <style>
-            :root { --neon: #00ff66; --accent: #ff00ff; --bg: #050505; --card: #111; }
+            :root { --neon: #00ff66; --accent: #ff00ff; --bg: #050505; --card: #111; --off: #ff4444; }
             body { background: var(--bg); color: #fff; font-family: 'Outfit', sans-serif; padding: 40px; margin: 0; display: flex; flex-direction: column; align-items: center; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; width: 1000px; max-width: 90vw; }
             .card { background: var(--card); border: 1px solid #222; padding: 25px; border-radius: 12px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
             .full { grid-column: span 2; }
-            .profit { font-size: 3.5em; color: var(--neon); font-weight: 700; text-shadow: 0 0 20px rgba(0,255,102,0.3); }
+            .profit { font-size: 3.5em; color: var(--neon); font-weight: 700; }
             .label { font-size: 0.8em; color: #555; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+            .status-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+            .led { width: 12px; height: 12px; border-radius: 50%; background: var(--off); box-shadow: 0 0 10px var(--off); transition: 0.3s; }
+            .led.on { background: var(--neon); box-shadow: 0 0 15px var(--neon); }
             .tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.7em; background: #222; color: var(--accent); }
-            input { width: 100%; background: #000; border: 1px solid #222; color: var(--neon); padding: 12px; border-radius: 6px; margin: 8px 0; }
+            input { width: 100%; background: #000; border: 1px solid #222; color: var(--neon); padding: 12px; border-radius: 6px; margin: 8px 0; box-sizing: border-box;}
             button { width: 100%; padding: 15px; border-radius: 6px; background: var(--accent); color: #fff; border: none; font-weight: 700; cursor: pointer; transition: 0.3s; }
-            button:hover { filter: brightness(1.2); }
             .node-row { display: flex; gap: 10px; margin-top: 15px; }
             .node { flex: 1; background: #0a0a0a; border: 1px solid #222; padding: 10px; text-align: center; border-radius: 8px; }
             .val-WIN { color: var(--neon); } .val-BIG_WIN { color: var(--accent); } .val-GAP { color: #444; }
@@ -134,8 +132,13 @@ app.get('/', (req, res) => {
     </head>
     <body>
         <div style="text-align: center; margin-bottom: 40px;">
-            <div class="tag">GAHENAX KERNEL v6.0 // PERSISTENT BUNKER ACTIVE</div>
+            <div class="tag">KERNEL v6.1 HEARTBEAT // MISSION CONTROL</div>
             <h1 style="letter-spacing: 15px; margin: 15px 0;">ORACLE</h1>
+            <div class="status-box">
+                <div id="led" class="led"></div>
+                <div id="status-text" style="font-size: 0.8em; color: #555;">DISCONNECTED</div>
+                <div id="last-sync" style="font-size: 0.7em; color: #333; margin-left: 10px;"></div>
+            </div>
         </div>
         <div class="grid">
             <div class="card">
@@ -174,19 +177,37 @@ app.get('/', (req, res) => {
                 location.reload();
             }
             async function update() {
-                const res = await fetch('/api/oracle');
-                const data = await res.json();
-                document.getElementById('disp-profit').innerText = Number(data.session.profit).toFixed(8);
-                document.getElementById('disp-rounds').innerText = data.session.rounds;
-                if (data.radar.forecast) {
-                    document.getElementById('radar-row').innerHTML = data.radar.forecast.map(f => \`
-                        <div class="node">
-                            <div style="font-size:0.6em; color:#444;">#\${f.nonce}</div>
-                            <div class="val-\${f.type}">\${f.val}</div>
-                            <div style="font-size:0.5em; opacity:0.5;">\${f.type}</div>
-                        </div>
-                    \`).join('');
-                }
+                try {
+                    const res = await fetch('/api/oracle');
+                    const data = await res.json();
+                    document.getElementById('disp-profit').innerText = Number(data.session.profit).toFixed(8);
+                    document.getElementById('disp-rounds').innerText = data.session.rounds;
+                    
+                    // HEARBEAT LOGIC
+                    const timeDiff = (data.server_time - data.session.last_heartbeat) / 1000;
+                    const led = document.getElementById('led');
+                    const st = document.getElementById('status-text');
+                    if (timeDiff < 10 && data.session.last_heartbeat > 0) {
+                        led.classList.add('on');
+                        st.innerText = "CONNECTED [FAUCET_LIVE]";
+                        st.style.color = "var(--neon)";
+                    } else {
+                        led.classList.remove('on');
+                        st.innerText = "DISCONNECTED [WAITING_HEARTBEAT]";
+                        st.style.color = "#555";
+                    }
+                    document.getElementById('last-sync').innerText = "LAST PACKET: " + timeDiff.toFixed(1) + "s AGO";
+
+                    if (data.radar.forecast) {
+                        document.getElementById('radar-row').innerHTML = data.radar.forecast.map(f => \`
+                            <div class="node">
+                                <div style="font-size:0.6em; color:#444;">#\${f.nonce}</div>
+                                <div class="val-\${f.type}">\${f.val}</div>
+                                <div style="font-size:0.5em; opacity:0.5;">\${f.type}</div>
+                            </div>
+                        \`).join('');
+                    }
+                } catch(e) {}
             }
             setInterval(update, 2000);
             update();
