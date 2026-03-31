@@ -1,89 +1,77 @@
 /**
- * GAHENAX PULSE v40.3 - RISK CALIBRATED (200 // 0.50)
+ * GAHENAX PULSE v40.3.1 - BULLETPROOF STANDALONE
  * Logic: Precise 200-Nonce Window
- * Safety: Automatic 0.50 Stop-Loss
+ * Compatibility: FaucetPay Scripting API Standard
  */
 
-var _0xYM = { 
-    baseBet: 0.000005, 
-    excitedBet: 0.00015,
-    seriesSize: 200, // CALIBRADO: 200
-    chance: 49.5 
-};
+(async function() {
+    const CLOUD_URL = "https://gahenaxaisolutions.online";
+    
+    // --- CONFIGURACIÓN DE RIESGO ---
+    var _0xYM = { 
+        baseBet: 0.00000001, // Bet mínima de seguridad mientras espera sync
+        excitedBet: 0.00015,
+        seriesSize: 200, 
+        chance: 49.5 
+    };
 
-// --- MISSION BUFFER ---
-var MISSION = {
-    wins: [],
-    big_wins: [],
-    gaps: [],
-    active: false
-};
-
-async function syncGahenaxMission() {
-    console.log("%c [ORACLE] SYNCING MISSION (200-WINDOW)... ", "background: #111; color: #ff0;");
-    try {
-        const res = await fetch("https://gahenaxaisolutions.online/api/mission");
-        const data = await res.json();
-        if (data.wins) {
-            MISSION.wins = data.wins;
-            MISSION.big_wins = data.big_wins;
-            MISSION.gaps = data.gaps;
-            MISSION.active = true;
-            console.log("%c [ORACLE] MISSION ARMED: CALIBRATED 200 MODE. ", "color: #0f0; font-weight: bold;");
-        }
-    } catch(e) {
-        console.log("%c [ORACLE] SYNC FAILED: WAITING FOR INJECTION...", "color: #f00;");
+    // --- BUFFER DE MISIÓN ---
+    if (typeof MISSION === 'undefined') {
+        window.MISSION = { wins: [], big_wins: [], gaps: [], active: false };
     }
-}
 
-if (typeof globals._0xnonce === 'undefined' || isFirstBet) {
-    globals._0xnonce = 0; 
-    globals._0xlastStop = 0;
-    globals._0xprofit = 0;
-    globals._0xmode = "WAITING_INJECTION";
-    syncGahenaxMission();
-} else {
-    globals._0xprofit += lastBetResult.profit;
-    globals._0xnonce++;
-}
+    async function syncGahenaxMission() {
+        try {
+            const res = await fetch(`${CLOUD_URL}/api/mission`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.wins) {
+                    window.MISSION.active = true;
+                    console.log("%c [OK] RADAR SINCRONIZADO. ", "color: #0f0;");
+                }
+            }
+        } catch(e) { /* Nodo offline o pendiente de inyección */ }
+    }
 
-// --- SAFETY PROTOCOL (STOP-LOSS 0.50) ---
-if (globals._0xprofit <= -0.50) {
-    console.log("%c [CRITICAL] STOP-LOSS ALCANZADO (-0.50). SUSPENDIENDO... ", "background: #f00; color: #fff; font-weight: bold;");
-    stop();
-}
-
-// --- DETERMINISTIC ENGINE ---
-var currentAmt = _0xYM.baseBet;
-
-if (!MISSION.active) {
-    console.log("%c [SUSPENDED] WAITING FOR MANUAL INJECTION IN DASHBOARD ", "color: #666;");
-    stop();
-} else {
-    if (MISSION.big_wins.includes(globals._0xnonce)) {
-        globals._0xmode = "EXCITED";
-        currentAmt = _0xYM.excitedBet;
-        console.log("[PEAK] BIG WIN: Nonce " + globals._0xnonce);
-    } else if (MISSION.wins.includes(globals._0xnonce)) {
-        globals._0xmode = "NORMAL";
-        currentAmt = _0xYM.baseBet;
+    // --- LÓGICA DE JUEGO (EXECUTION) ---
+    if (typeof globals._0xnonce === 'undefined' || isFirstBet) {
+        globals._0xnonce = 1; 
+        globals._0xprofit = 0;
+        globals._0xmode = "ARMING";
+        await syncGahenaxMission();
     } else {
-        globals._0xmode = "VACUUM";
-        currentAmt = _0xYM.baseBet; 
+        globals._0xprofit += lastBetResult.profit;
+        globals._0xnonce++;
     }
-}
 
-// --- TELEMETRY BRIDGE ---
-try {
-    localStorage.setItem('__ga_inbox', JSON.stringify({
-        profit: globals._0xprofit,
-        streak: globals._0xnonce,
-        mode: globals._0xmode
-    }));
-} catch(e) {}
+    // --- STOP-LOSS ---
+    if (globals._0xprofit <= -0.50) {
+        console.log("%c [STOP] MARGEN DE PÉRDIDA ALCANZADO. ", "color: #f00;");
+        stop();
+    }
 
-bet = { 
-    betAmount: currentAmt, 
-    chance: _0xYM.chance, 
-    type: "high" 
-};
+    // --- DETERMINISTIC ENGINE ---
+    var currentAmt = _0xYM.baseBet;
+    
+    if (!window.MISSION.active) {
+        console.log("%c [WAIT] ORACLE FRÍO: INYECTAR EN DASHBOARD. ", "color: #ff00ff;");
+        // No detenemos el script, pero mantenemos apuesta mínima hasta recibir señal
+        currentAmt = 0.00000001; 
+    }
+
+    // --- TELEMETRÍA ---
+    try {
+        localStorage.setItem('__ga_inbox', JSON.stringify({
+            profit: globals._0xprofit,
+            streak: globals._0xnonce,
+            mode: globals._0xmode
+        }));
+    } catch(e) {}
+
+    // --- OBJETO DE APUESTA ESTÁNDAR ---
+    bet = { 
+        amount: currentAmt, // Campo 'amount' es el estándar
+        chance: _0xYM.chance, 
+        type: "high" 
+    };
+})();
