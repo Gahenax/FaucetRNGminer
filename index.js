@@ -2,9 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 5000;
+const STATE_FILE = path.join(__dirname, 'state.json');
 
 app.use(cors());
 app.use(express.json());
@@ -198,6 +200,7 @@ app.post('/api/telemetry', (req, res) => {
         
         // Update forecast window instantly
         STATE.forecast = updateForecast(STATE.active_seeds.server, STATE.active_seeds.client, streak);
+        saveState();
     }
     res.json({ status: "ok" });
 });
@@ -212,6 +215,7 @@ app.post('/api/seeds', (req, res) => {
         STATE.mode = "RADAR_ARMED";
         STATE.forecast = updateForecast(server, client, STATE.active_seeds.nonce);
         STATE.history = []; // Reset history for new session
+        saveState();
         res.json({ status: "calibrated" });
     } else {
         res.status(400).json({ error: "Invalid seeds" });
