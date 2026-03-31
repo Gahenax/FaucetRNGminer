@@ -14,6 +14,7 @@ FILES_TO_DEPLOY = [
     "package.json",
     "mines_radar.html",
     "tmp/restart.txt",
+    "scripts/gahenax_pulse_v63.js",
     "scripts/gahenax_pulse_v62.js",
     "scripts/gahenax_pulse_v60.js",
     "scripts/gahenax_hybrid_v6.js",
