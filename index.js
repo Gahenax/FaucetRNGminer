@@ -194,15 +194,20 @@ app.post('/api/telemetry', (req, res) => {
         if (STATE.history.length > 15) STATE.history.shift();
 
         STATE.usdc_profit = profit || STATE.usdc_profit;
-        STATE.active_seeds.nonce = streak;
-        STATE.mode = mode || STATE.mode;
         STATE.packet_count++;
         
         // Update forecast window instantly
+        STATE.active_seeds.nonce = streak;
         STATE.forecast = updateForecast(STATE.active_seeds.server, STATE.active_seeds.client, streak);
-        saveState();
     }
-    res.json({ status: "ok" });
+    
+    STATE.telemetry = req.body;
+    saveState();
+    res.json({ success: true });
+});
+
+app.get('/api/telemetry', (req, res) => {
+    res.json(STATE.telemetry || { profit: 0, rounds: 0, mode: "IDLE" });
 });
 
 app.get('/api/status', (req, res) => res.json(STATE));
