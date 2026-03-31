@@ -14,7 +14,7 @@ const STATE_FILE = path.join(__dirname, 'state.json');
 
 // --- 1. CORE STATE MANAGEMENT ---
 let STATE = {
-    metadata: { version: "6.1", status: "IDLE", mission_count: 0 },
+    metadata: { version: "6.1.1", status: "IDLE", mission_count: 0 },
     config: { server: "", client: "", current_nonce: 0 },
     session: { profit: 0, rounds: 0, last_mode: "IDLE", last_heartbeat: 0 },
     radar: { forecast: [], history: [] }
@@ -29,8 +29,11 @@ function syncStorage() {
 if (fs.existsSync(STATE_FILE)) {
     try {
         const saved = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-        STATE = { ...STATE, ...saved };
-        console.log(`[GAHENAX] Recovery: MISSION #${STATE.metadata.mission_count}`);
+        // Deep merge config and session, but PROTECT code-level metadata
+        STATE.config = { ...STATE.config, ...saved.config };
+        STATE.session = { ...STATE.session, ...saved.session };
+        STATE.radar.history = saved.radar?.history || [];
+        console.log(`[GAHENAX] Selective Recovery: MISSION #${STATE.metadata.mission_count} LOADED.`);
     } catch(e) { console.log("[GAHENAX] Fresh start initiated."); }
 }
 
