@@ -1,66 +1,69 @@
-# GAHENAX DASHBOARD v20.4 - GROUND CONTROL
-from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS
-import time
-import os
-import sys
-import hmac
-import hashlib
+const express = require('express');
+const cors = require('cors');
+const crypto = require('crypto');
+const path = require('path');
 
-app = Flask(__name__)
-CORS(app)
+const app = express();
+const port = process.env.PORT || 5000;
 
-# ESTADO GLOBAL - VOLATILE SESSION
-STATE = {
-    "usdc_profit": 0.0,
-    "last_update": 0,
-    "packet_count": 0,
-    "mcp_active": True,
-    "risk": 0,
-    "wins": 0,
-    "losses": 0,
-    "streak": 0,
-    "mode": "WAITING_INJECTION",
-    "calibrated": False,
-    "active_seeds": {
-        "server": "",
-        "client": "",
-        "nonce": 0
+app.use(cors());
+app.use(express.json());
+
+// ESTADO GLOBAL - VOLATILE SESSION (Node.js Edition)
+let STATE = {
+    usdc_profit: 0.0,
+    last_update: 0,
+    packet_count: 0,
+    risk: 0,
+    wins: 0,
+    losses: 0,
+    streak: 0,
+    mode: "WAITING_INJECTION",
+    calibrated: false,
+    active_seeds: {
+        server: "",
+        client: "",
+        nonce: 0
     },
-    "mission": {
-        "wins": [],
-        "big_wins": [],
-        "gaps": []
+    mission: {
+        wins: [],
+        big_wins: [],
+        gaps: []
     }
+};
+
+/**
+ * DETERMINISTIC ENGINE (HMAC-SHA256)
+ * Node.js Crypto Implementation
+ */
+function calculatePrediction(serverSeed, clientSeed, startNonce, count = 1000) {
+    const wins = [], big_wins = [], gaps = [];
+    for (let nonce = startNonce; nonce < startNonce + count; nonce++) {
+        const message = `${clientSeed}:${nonce}`;
+        const hmac = crypto.createHmac('sha256', serverSeed).update(message).digest('hex');
+        
+        // FaucetPay Logic: Result = hex[:8] % 1,000,000 / 10,000
+        const resVal = parseInt(hmac.substring(0, 8), 16) % 1000000 / 10000;
+        
+        if (resVal > 90.0) {
+            big_wins.push(nonce);
+        } else if (resVal > 50.49) {
+            wins.push(nonce);
+        } else {
+            gaps.push(nonce);
+        }
+    }
+    return { wins, big_wins, gaps };
 }
 
-def calculate_prediction(server_seed, client_seed, start_nonce, count=1000):
-    wins, big_wins, gaps = [], [], []
-    for nonce in range(start_nonce, start_nonce + count):
-        # HMAC-SHA256 Logic (Standard FaucetPay/Provably Fair)
-        message = f"{client_seed}:{nonce}"
-        h = hmac.new(server_seed.encode(), message.encode(), hashlib.sha256).hexdigest()
-        
-        # Convert hex to decimal result (FaucetPay standard)
-        res_val = int(h[:8], 16) % 1000000 / 10000
-        
-        if res_val > 90.0:
-            big_wins.append(nonce)
-        elif res_val > 50.49:
-            wins.append(nonce)
-        else:
-            gaps.append(nonce)
-    return {"wins": wins, "big_wins": big_wins, "gaps": gaps}
-
-@app.route("/")
-def index():
-    return """
+app.get('/', (req, res) => {
+    res.send(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>GAHENAX GROUND CONTROL v20.4</title>
+        <title>GAHENAX GROUND CONTROL v40.1 (Node.js)</title>
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
         <style>
             :root {
@@ -126,7 +129,7 @@ def index():
     <body>
         <div style="margin-bottom: 40px; text-align: center;">
             <h1 style="margin:0; letter-spacing: 5px;">GAHENAX <span style="color:var(--accent)">GROUND CONTROL</span></h1>
-            <div style="font-size: 0.8em; color: #444;">DETERMINISTIC ORACLE INTERFACE v20.4</div>
+            <div style="font-size: 0.8em; color: #444;">DETERMINISTIC ORACLE NODE v40.1</div>
         </div>
         
         <div class="dashboard">
@@ -179,7 +182,7 @@ def index():
                 const data = {
                     server: document.getElementById('in-server').value,
                     client: document.getElementById('in-client').value,
-                    nonce: document.getElementById('in-nonce').value
+                    nonce: parseInt(document.getElementById('in-nonce').value)
                 };
                 
                 try {
@@ -190,12 +193,13 @@ def index():
                     });
                     if (res.ok) {
                         msg.style.color = "var(--neon-green)";
-                        msg.innerText = ">> SUCCESS: ORACLE CALIBRATED AT NONCE " + data.nonce;
+                        const resData = await res.json();
+                        msg.innerText = ">> SUCCESS: MISSION ARMED AT NONCE " + data.nonce;
                         setTimeout(() => { msg.innerText = ""; }, 4000);
                     }
                 } catch(e) {
                     msg.style.color = "red";
-                    msg.innerText = ">> ERROR: REFUSED BY GROUND CONTROL";
+                    msg.innerText = ">> ERROR: NODE REFUSED INJECTION";
                 }
             }
 
@@ -206,73 +210,66 @@ def index():
                     
                     document.getElementById('profit').innerText = data.usdc_profit.toFixed(8);
                     document.getElementById('packets').innerText = data.packet_count;
-                    document.getElementById('nonce').innerText = data.streak;
                     document.getElementById('mode').innerText = data.mode;
                     
-                    let riskVal = minMax((data.streak / 800) * 100, 0, 100);
-                    document.getElementById('risk').innerText = riskVal.toFixed(1) + "%";
-                    document.getElementById('risk-fill').style.width = riskVal + "%";
-                    
-                    if (riskVal > 85) {
-                        document.getElementById('risk-fill').style.background = "red";
-                        document.getElementById('risk-fill').style.boxShadow = "0 0 15px red";
-                    } else if (riskVal > 50) {
-                        document.getElementById('risk-fill').style.background = "orange";
-                        document.getElementById('risk-fill').style.boxShadow = "0 0 10px orange";
+                    if (data.calibrated) {
+                        document.getElementById('nonce').innerText = data.active_seeds.nonce;
+                        let riskVal = Math.min(Math.max((data.streak / 800) * 100, 0), 100);
+                        document.getElementById('risk').innerText = riskVal.toFixed(1) + "%";
+                        document.getElementById('risk-fill').style.width = riskVal + "%";
                     } else {
-                        document.getElementById('risk-fill').style.background = "var(--neon-green)";
-                        document.getElementById('risk-fill').style.boxShadow = "0 0 10px var(--neon-green)";
+                        document.getElementById('nonce').innerText = "--";
+                        document.getElementById('risk').innerText = "--%";
+                        document.getElementById('risk-fill').style.width = "0%";
                     }
                 } catch(e) {}
             }
-            
-            function minMax(val, min, max) { return Math.min(Math.max(val, min), max); }
             setInterval(updateStats, 800);
         </script>
     </body>
     </html>
-    """
+    `);
+});
 
-@app.route("/api/telemetry", methods=["POST"])
-def telemetry():
-    data = request.json
-    if data:
-        STATE["usdc_profit"] = data.get("profit", STATE["usdc_profit"])
-        STATE["streak"] = data.get("streak", STATE["streak"])
-        STATE["mode"] = data.get("mode", STATE["mode"])
-        STATE["packet_count"] += 1
-        STATE["last_update"] = time.time()
-    return jsonify({"status": "ok"})
+app.post('/api/telemetry', (req, res) => {
+    const data = req.body;
+    if (data) {
+        STATE.usdc_profit = data.profit || STATE.usdc_profit;
+        STATE.streak = data.streak || STATE.streak;
+        STATE.mode = data.mode || STATE.mode;
+        STATE.packet_count++;
+        STATE.last_update = Date.now();
+    }
+    res.json({ status: "ok" });
+});
 
-@app.route("/api/status")
-def status():
-    return jsonify(STATE)
+app.get('/api/status', (req, res) => {
+    res.json(STATE);
+});
 
-@app.route("/api/seeds", methods=["GET", "POST"])
-def seeds():
-    if request.method == "POST":
-        data = request.json
-        server = data.get("server")
-        client = data.get("client")
-        nonce = int(data.get("nonce", 0))
-        
-        if server and client:
-            STATE["active_seeds"] = {"server": server, "client": client, "nonce": nonce}
-            STATE["mission"] = calculate_prediction(server, client, nonce)
-            STATE["calibrated"] = True
-            STATE["mode"] = "CALIBRATED_ARMED"
-            return jsonify({"status": "injected", "mission_size": len(STATE["mission"]["wins"])})
-        return jsonify({"error": "Invalid seed packet"}), 400
-    
-    if not STATE["calibrated"]:
-        return jsonify({"error": "Oracle not calibrated. Injection required."}), 403
-    return jsonify(STATE["active_seeds"])
+app.get('/api/seeds', (req, res) => {
+    if (!STATE.calibrated) return res.status(403).json({ error: "Waiting for injection" });
+    res.json(STATE.active_seeds);
+});
 
-@app.route("/api/mission")
-def mission():
-    if not STATE["calibrated"]:
-        return jsonify({"error": "No active mission"}), 403
-    return jsonify(STATE["mission"])
+app.post('/api/seeds', (req, res) => {
+    const { server, client, nonce } = req.body;
+    if (server && client) {
+        STATE.active_seeds = { server, client, nonce: parseInt(nonce || 0) };
+        STATE.mission = calculatePrediction(server, client, STATE.active_seeds.nonce);
+        STATE.calibrated = true;
+        STATE.mode = "CALIBRATED_ARMED";
+        res.json({ status: "injected", mission_size: STATE.mission.wins.length });
+    } else {
+        res.status(400).json({ error: "Missing seed data" });
+    }
+});
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=False)
+app.get('/api/mission', (req, res) => {
+    if (!STATE.calibrated) return res.status(403).json({ error: "No active mission" });
+    res.json(STATE.mission);
+});
+
+app.listen(port, () => {
+    console.log(`GAHENAX NODE ORACLE v40.1 LIVE ON PORT ${port}`);
+});

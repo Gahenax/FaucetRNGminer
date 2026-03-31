@@ -1,0 +1,15 @@
+{
+  "name": "gahenax-dice-oracle",
+  "version": "40.1.0",
+  "description": "Deterministic FaucetPay Oracle Dashboard - Sovereign Cloud Edition",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  },
+  "author": "Antigravity AI",
+  "license": "MIT"
+}
