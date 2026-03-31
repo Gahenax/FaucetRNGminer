@@ -228,6 +228,7 @@ app.get('/', (req, res) => {
                     <div id="led" class="led"></div>
                     <div id="status-text" style="font-size: 12px; font-weight: 600; color: #64748b;">OFFLINE</div>
                 </div>
+                <div id="veracity-badge" style="margin-top: 12px; font-size: 9px; font-weight: 800; padding: 4px 8px; border-radius: 4px; display: none;"></div>
             </div>
 
             <div class="stat-group" style="padding: 0 10px;">
@@ -293,7 +294,24 @@ app.get('/', (req, res) => {
                     const led = document.getElementById('led');
                     const st = document.getElementById('status-text');
                     const log = document.getElementById('log-stream');
+                    const badge = document.getElementById('veracity-badge');
                     
+                    // --- VERACITY GUARD v7.3 ---
+                    const sSeed = data.config.server;
+                    if (sSeed && sSeed.length === 64 && /^[0-9a-f]+$/i.test(sSeed)) {
+                        badge.style.display = "block";
+                        badge.innerText = "VERIFICATION MODE (HASH)";
+                        badge.style.background = "#334155";
+                        badge.style.color = "#94a3b8";
+                    } else if (sSeed && sSeed.length > 0) {
+                        badge.style.display = "block";
+                        badge.innerText = "ACCURATE PREDICTION (REAL SEED)";
+                        badge.style.background = "var(--neon)";
+                        badge.style.color = "#000";
+                    } else {
+                        badge.style.display = "none";
+                    }
+
                     if (timeDiff < 10 && data.session.last_heartbeat > 0) {
                         if (!led.classList.contains('on')) {
                             log.innerHTML += \`<div>[SYSTEM] Connection Re-Established. HEARTBEAT ACTIVE. </div>\`;
