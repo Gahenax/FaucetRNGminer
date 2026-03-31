@@ -30,15 +30,16 @@ def connect():
     return ftp
 
 def upload_file(ftp, local_path):
-    remote_path = f"{REMOTE_APP_DIR}/{local_path}"
+    # Use strict relative paths from the FTP root login
+    remote_path = local_path.lstrip("/") 
     print(f"  [NODE-TARGET-PUSH] {local_path} -> {remote_path}")
     
     # Handle subdirectories (scripts, tmp)
     if "/" in local_path:
         dirs = local_path.split("/")[:-1]
-        current_dir = REMOTE_APP_DIR
+        current_dir = ""
         for d in dirs:
-            current_dir = f"{current_dir}/{d}"
+            current_dir = d if not current_dir else f"{current_dir}/{d}"
             try: ftp.mkd(current_dir)
             except: pass
 

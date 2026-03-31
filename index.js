@@ -14,7 +14,7 @@ const STATE_FILE = path.join(__dirname, 'state.json');
 
 // --- 1. CORE STATE MANAGEMENT ---
 let STATE = {
-    metadata: { version: "6.1.1", status: "IDLE", mission_count: 0 },
+    metadata: { version: "6.1.2", status: "IDLE", mission_count: 0 },
     config: { server: "", client: "", current_nonce: 0 },
     session: { profit: 0, rounds: 0, last_mode: "IDLE", last_heartbeat: 0 },
     radar: { forecast: [], history: [] }
