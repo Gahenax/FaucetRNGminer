@@ -95,7 +95,8 @@ app.get('/', (req, res) => {
             <div class="panel">
                 <div class="label">LIVE TELEMETRY // PROFIT</div>
                 <div id="profit" class="profit">0.00000000</div>
-                <div class="label" style="margin-top:20px;">PACKETS RECEIVED: <span id="packets" style="color:var(--accent)">0</span></div>
+                <div class="label" style="margin-top:20px; color:#ff4444;">SAFE MARGIN (STOP-LOSS): -0.50 USDC</div>
+                <div class="label" style="margin-top:5px;">PACKETS RECEIVED: <span id="packets" style="color:var(--accent)">0</span></div>
             </div>
 
             <div class="panel">
