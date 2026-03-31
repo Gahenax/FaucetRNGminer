@@ -8,6 +8,7 @@ const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
 
 // ESTADO GLOBAL - PREDICTIVE ORACLE STATE (v40.2)
 let STATE = {
